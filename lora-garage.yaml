@@ -1,0 +1,28 @@
+# ===========================================================================
+#  Fichier à copier dans le dossier ESPHome de Home Assistant
+#  (/config/esphome/lora-garage.yaml). Tout le reste est téléchargé depuis
+#  GitHub à la compilation ; les !secret viennent de ton secrets.yaml.
+# ===========================================================================
+
+substitutions:
+  name: lora-garage
+  friendly_name: Garage LoRa
+  # Fréquence à laquelle ESPHome relit le dépôt GitHub ; 0s pour forcer
+  # la prise en compte d'un push, puis remets 1d.
+  philsgarage_refresh: 1d
+
+  # Surcharges éventuelles (voir packages/radio/<puce>.yaml pour la liste) :
+  # lora_cs_pin: GPIO18
+  # lora_dio0_pin: GPIO26
+  # lora_tx_power: "17"
+  # philsgarage_components: github://Phil-ibert/PhilsGarage@dev   # autre branche
+
+packages:
+  philsgarage:
+    url: https://github.com/Phil-ibert/PhilsGarage
+    ref: main
+    refresh: ${philsgarage_refresh}
+    files:
+      - packages/lora-garage.yaml
+      # Puce Semtech : sx127x.yaml (SX1276/78, Ra-02, RFM9x) ou sx126x.yaml (SX1262/68, E22)
+      - packages/radio/sx127x.yaml

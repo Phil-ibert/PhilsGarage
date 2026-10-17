@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------------------
+# Modem Semtech SX1261 / SX1262 / SX1268 / LLCC68 (Ebyte E22-400M, Heltec V3
+# (868/915 uniquement), Wio-SX1262, modules Waveshare...)
+#
+# Pour l'utiliser : dans lora-garage.yaml (celui de Home Assistant), remplace
+#     - packages/radio/sx127x.yaml
+# par
+#     - packages/radio/sx126x.yaml
+# puis adapte les broches dans `substitutions:`.
+#
+# Compatible sur l'air avec l'émetteur SX127x existant tant que fréquence, SF,
+# BW, CR, préambule et sync word correspondent (0x12 côté SX127x = 0x14 0x24
+# côté SX126x).
+# ---------------------------------------------------------------------------
+substitutions:
+  lora_sck_pin: GPIO18
+  lora_miso_pin: GPIO19
+  lora_mosi_pin: GPIO23
+  lora_cs_pin: GPIO5
+  lora_rst_pin: GPIO4
+  lora_busy_pin: GPIO27
+  lora_dio1_pin: GPIO26
+
+  # sx1261 / sx1262 / sx1268 / llcc68. Pour 433 MHz : SX1268 (ex. E22-400M) ou SX1262.
+  lora_hw_version: sx1268
+  # true si DIO2 pilote le commutateur d'antenne (cas de la plupart des modules)
+  lora_rf_switch: "true"
+  # Tension du TCXO fournie par DIO3 (souvent 1_8V sur les modules Ebyte/Heltec), sinon NONE
+  lora_tcxo_voltage: 1_8V
+
+  lora_frequency: 433MHz
+  lora_bandwidth: 125_0kHz
+  lora_spreading_factor: "7"
+  lora_coding_rate: CR_4_5
+  lora_preamble_size: "8"
+  lora_sync_msb: "0x14"
+  lora_sync_lsb: "0x24"
+  # Puissance en sortie de la puce. ATTENTION : les modules avec amplificateur
+  # externe (E22-400M30S = +30 dBm !) ajoutent leur gain à cette valeur.
+  lora_tx_power: "17"
+
+spi:
+  - id: lora_spi
+    clk_pin: ${lora_sck_pin}
+    miso_pin: ${lora_miso_pin}
+    mosi_pin: ${lora_mosi_pin}
+
+sx126x:
+  id: lora_radio
+  spi_id: lora_spi
+  cs_pin: ${lora_cs_pin}
+  rst_pin: ${lora_rst_pin}
+  busy_pin: ${lora_busy_pin}
+  dio1_pin: ${lora_dio1_pin}
+  hw_version: ${lora_hw_version}
+  rf_switch: ${lora_rf_switch}
+  tcxo_voltage: ${lora_tcxo_voltage}
+  modulation: LORA
+  frequency: ${lora_frequency}
+  bandwidth: ${lora_bandwidth}
+  spreading_factor: ${lora_spreading_factor}
+  coding_rate: ${lora_coding_rate}
+  preamble_size: ${lora_preamble_size}
+  sync_value: [ "${lora_sync_msb}", "${lora_sync_lsb}" ]
+  crc_enable: true
+  pa_power: ${lora_tx_power}
+  rx_start: true
+  on_packet:
+    then:
+      - lambda: id(lora_link).handle_packet(x, rssi, snr);
+
+phils_lora:
+  id: lora_link
+  on_transmit:
+    then:
+      - sx126x.send_packet:
+          id: lora_radio
+          data: !lambda return x;

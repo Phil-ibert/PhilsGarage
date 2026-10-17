@@ -1,0 +1,259 @@
+# ===========================================================================
+#  Passerelle LoRa du garage -> Home Assistant (API native, sans MQTT)
+#
+#  Remplace Receiver.ino. Compatible avec l'émetteur Arduino existant
+#  (Transmitter.ino + lib PhilsCrypto) ET avec Transmitter_v2 : même clé AES,
+#  même format "#T:..;H:..;L:..;E:..;P:..$~crc32".
+#
+#  Package de base, sans la radio : à combiner avec packages/radio/<puce>.yaml.
+#  Voir lora-garage.yaml à la racine du dépôt (fichier à placer dans Home Assistant).
+#  Les !secret sont lus dans le secrets.yaml de ton dossier ESPHome.
+# ===========================================================================
+
+substitutions:
+  name: lora-garage
+  friendly_name: Garage LoRa
+  # LED / sortie recopiant l'état de la lumière (GPIO2 = LED bleue des DevKit,
+  # comme light_pin dans Receiver.ino). Mets une broche libre si tu n'en veux pas.
+  light_mirror_pin: GPIO2
+
+  # D'où ESPHome prend le composant phils_lora : ce dépôt GitHub, ou un chemin
+  # local pour développer (ex. /config/esphome/PhilsGarage/components)
+  philsgarage_components: github://Phil-ibert/PhilsGarage@main
+  philsgarage_refresh: 1d
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  comment: Passerelle LoRa 433 MHz (PhilsCryptoLoRa) vers Home Assistant
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: ${philsgarage_components}
+    components: [phils_lora]
+    refresh: ${philsgarage_refresh}
+
+logger:
+  level: DEBUG
+  logs:
+    sx127x: INFO
+
+api:
+  encryption:
+    key: !secret lora_garage_api_key
+
+ota:
+  - platform: esphome
+    # Chiffré avec la clé de l'API (pas besoin de mot de passe séparé)
+    encryption:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${name} fallback"
+    password: !secret lora_garage_ap_password
+
+captive_portal:
+
+# Page d'état locale (remplace le WebServer de Receiver.ino) : http://lora-garage.local
+web_server:
+  port: 80
+  version: 3
+  ota: false   # les mises à jour passent par l'OTA chiffrée ci-dessus
+
+# ---------------------------------------------------------------------------
+# Protocole : la clé AES-256 doit être celle de PhilsCryptoLoRa.h (aes_key[32]).
+# Le reste de `phils_lora:` (on_transmit) est dans packages/radio/<puce>.yaml.
+# ---------------------------------------------------------------------------
+phils_lora:
+  id: lora_link
+  key: !secret phils_lora_aes_key
+
+debug:
+  update_interval: 60s
+
+output:
+  - platform: gpio
+    id: light_mirror
+    pin: ${light_mirror_pin}
+
+# ---------------------------------------------------------------------------
+# Capteurs reçus de l'émetteur
+# ---------------------------------------------------------------------------
+sensor:
+  - platform: phils_lora
+    field: T
+    name: Température
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      # La lib DHT22 renvoie -273 en cas d'échec de lecture : on l'ignore
+      # au lieu de le publier (pics à -273 °C dans l'historique).
+      - lambda: |-
+          if (x < -40.0f || x > 80.0f) return {};
+          return x;
+
+  - platform: phils_lora
+    field: H
+    name: Humidité
+    unit_of_measurement: "%"
+    device_class: humidity
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      # -1 = échec de lecture DHT22
+      - lambda: |-
+          if (x < 0.0f || x > 100.0f) return {};
+          return x;
+
+  - platform: phils_lora
+    field: E
+    id: garage_energy
+    name: Énergie
+    unit_of_measurement: kWh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    filters:
+      - lambda: |-
+          if (x < 0.0f) return {};
+          return x;
+
+  # Puissance instantanée : uniquement envoyée par Transmitter_v2 (champ W).
+  # Avec l'émetteur d'origine cette entité reste "inconnue".
+  - platform: phils_lora
+    field: W
+    name: Puissance
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+
+  - platform: phils_lora
+    field: P
+    name: Impulsions (cycle kWh)
+    icon: mdi:meter-electric
+    accuracy_decimals: 0
+    entity_category: diagnostic
+
+  - platform: phils_lora
+    type: rssi
+    name: LoRa RSSI
+  - platform: phils_lora
+    type: snr
+    name: LoRa SNR
+  - platform: phils_lora
+    type: valid_packets
+    name: LoRa paquets valides
+  - platform: phils_lora
+    type: rejected_packets
+    name: LoRa paquets rejetés
+
+  # Surveillance mémoire de la passerelle (si "Heap libre" baisse en continu
+  # sur plusieurs jours, il y a une fuite ; si seul "Plus grand bloc" baisse,
+  # c'est de la fragmentation).
+  - platform: debug
+    free:
+      name: Heap libre
+    block:
+      name: Heap plus grand bloc
+    min_free:
+      name: Heap minimum atteint
+    loop_time:
+      name: Durée de boucle
+
+  - platform: wifi_signal
+    name: WiFi signal
+    update_interval: 60s
+  - platform: uptime
+    name: Uptime
+
+binary_sensor:
+  # ON si un paquet valide a été reçu depuis moins de `timeout`.
+  # L'émetteur d'origine n'émet que sur changement de valeur : garde une marge.
+  # Avec Transmitter_v2 (battement toutes les 60 s) tu peux descendre à 5min.
+  - platform: phils_lora
+    type: link
+    name: Liaison LoRa
+    timeout: 30min
+
+text_sensor:
+  - platform: phils_lora
+    type: last_message
+    name: LoRa dernier message
+    disabled_by_default: true
+  - platform: phils_lora
+    type: last_error
+    name: LoRa dernière erreur
+    disabled_by_default: true
+
+# ---------------------------------------------------------------------------
+# Commandes vers l'émetteur
+# ---------------------------------------------------------------------------
+switch:
+  # Envoie "#S:1$" / "#S:0$" (3 fois, espacées de 600 ms) ; l'état affiché suit
+  # ensuite le champ L des messages reçus. Pour l'afficher comme une lumière
+  # dans HA : Paramètres > Entrées > "Changer le type d'un interrupteur".
+  - platform: phils_lora
+    id: garage_light
+    name: Lumière garage
+    icon: mdi:lightbulb
+    command_field: S
+    state_field: L
+    repeat: 3
+    repeat_interval: 600ms
+    confirm_delay: 2s
+    on_turn_on:
+      - output.turn_on: light_mirror
+    on_turn_off:
+      - output.turn_off: light_mirror
+
+number:
+  # Valeur à laquelle remettre le compteur. Contrairement à Receiver.ino, elle
+  # n'est PLUS écrasée par chaque mesure d'énergie reçue, et n'est plus
+  # bornée à 1..100 (bornes par défaut de HA quand min/max ne sont pas déclarés).
+  - platform: template
+    id: energy_reset_value
+    name: Compteur - valeur de remise à zéro
+    icon: mdi:counter
+    unit_of_measurement: kWh
+    entity_category: config
+    mode: box
+    min_value: 0
+    max_value: 999999
+    step: 0.001
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+
+button:
+  - platform: template
+    name: Compteur - appliquer la valeur
+    icon: mdi:meter-electric-outline
+    entity_category: config
+    on_press:
+      - phils_lora.send:
+          payload: !lambda |-
+            char buf[32];
+            snprintf(buf, sizeof(buf), "#R:%.3f$", id(energy_reset_value).state);
+            return std::string(buf);
+  - platform: template
+    name: Compteur - recopier l'énergie actuelle
+    icon: mdi:content-copy
+    entity_category: config
+    on_press:
+      - lambda: |-
+          if (id(garage_energy).has_state()) {
+            auto call = id(energy_reset_value).make_call();
+            call.set_value(id(garage_energy).state);
+            call.perform();
+          }
+  - platform: restart
+    name: Redémarrer

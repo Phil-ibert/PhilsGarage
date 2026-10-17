@@ -1,0 +1,74 @@
+# ---------------------------------------------------------------------------
+# Modem Semtech SX1276 / SX1277 / SX1278 / SX1279 (Ra-01, Ra-02, RFM95/96/98,
+# TTGO LoRa32 V1/V2, Heltec V2...)
+#
+# Toutes les valeurs ci-dessous sont des valeurs PAR DÉFAUT : redéfinis
+# uniquement celles qui changent dans le bloc `substitutions:` de ton fichier
+# lora-garage.yaml (celui de Home Assistant), il est prioritaire.
+#
+# Les paramètres radio DOIVENT être identiques à ceux de l'émetteur Arduino
+# (lib sandeepmistry/LoRa) : 433 MHz, SF7, BW 125 kHz, CR 4/5, préambule 8,
+# sync word 0x12 -> ce sont les valeurs par défaut de LoRa.begin().
+# ---------------------------------------------------------------------------
+substitutions:
+  # Câblage (valeurs = celles de PhilsCryptoLoRa.h + bus VSPI par défaut de l'ESP32)
+  lora_sck_pin: GPIO18
+  lora_miso_pin: GPIO19
+  lora_mosi_pin: GPIO23
+  lora_cs_pin: GPIO5
+  lora_rst_pin: GPIO4
+  # Attention : GPIO12 est une broche de "strapping" (tension de la flash).
+  # Ça fonctionne tant que DIO0 est à l'état bas au boot ; sur une nouvelle
+  # carte, préfère une autre broche (GPIO26, GPIO32...).
+  lora_dio0_pin: GPIO12
+
+  # Radio
+  lora_frequency: 433MHz
+  lora_bandwidth: 125_0kHz
+  lora_spreading_factor: "7"
+  lora_coding_rate: CR_4_5
+  lora_preamble_size: "8"
+  lora_sync_word: "0x12"   # 0x12 = réseau privé (défaut). Équivalent SX126x : 0x14 0x24
+  lora_pa_pin: BOOST       # BOOST pour Ra-02 / RFM9x ; RFO pour certains modules (max 15 dBm)
+  # 17 dBm = maximum du PA_BOOST et défaut de la lib LoRa (même valeur que l'émetteur).
+  # Pour mémoire : la limite en Europe sur 433,05-434,79 MHz est de 10 mW (10 dBm).
+  lora_tx_power: "17"
+
+spi:
+  - id: lora_spi
+    clk_pin: ${lora_sck_pin}
+    miso_pin: ${lora_miso_pin}
+    mosi_pin: ${lora_mosi_pin}
+
+sx127x:
+  id: lora_radio
+  spi_id: lora_spi
+  cs_pin: ${lora_cs_pin}
+  rst_pin: ${lora_rst_pin}
+  dio0_pin: ${lora_dio0_pin}
+  modulation: LORA
+  frequency: ${lora_frequency}
+  bandwidth: ${lora_bandwidth}
+  spreading_factor: ${lora_spreading_factor}
+  coding_rate: ${lora_coding_rate}
+  preamble_size: ${lora_preamble_size}
+  sync_value: ${lora_sync_word}
+  # CRC matériel sur NOS émissions (l'émetteur Arduino le vérifie s'il est présent).
+  # En réception (en-tête explicite) le CRC est indiqué dans l'en-tête du paquet,
+  # donc les paquets de l'émetteur d'origine (sans CRC) sont bien reçus.
+  crc_enable: true
+  pa_pin: ${lora_pa_pin}
+  pa_power: ${lora_tx_power}
+  rx_start: true
+  on_packet:
+    then:
+      - lambda: id(lora_link).handle_packet(x, rssi, snr);
+
+# Glue "protocole -> modem" : c'est le seul endroit qui connaît la puce radio.
+phils_lora:
+  id: lora_link
+  on_transmit:
+    then:
+      - sx127x.send_packet:
+          id: lora_radio
+          data: !lambda return x;

@@ -1,0 +1,7 @@
+# ESPHome
+secrets.yaml
+.esphome/
+/.pioenvs/
+/.piolibdeps/
+__pycache__/
+*.pyc
