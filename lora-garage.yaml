@@ -40,6 +40,12 @@ captive_portal:
 
 # --------------------------- Passerelle LoRa -------------------------------
 substitutions:
+  # Clé AES-256 partagée avec l'émetteur (aes_key[32] de PhilsCryptoLoRa.h).
+  # Soit une référence à ton secrets.yaml :
+  lora_aes_key: !secret phils_lora_aes_key
+  # soit la valeur directement (64 caractères hexa, ou le tableau C tel quel) :
+  # lora_aes_key: "0x.., 0x.., 0x.., ..."
+
   # Fréquence à laquelle ESPHome relit le dépôt GitHub ; 0s pour forcer
   # la prise en compte d'un push, puis remets 1d.
   philsgarage_refresh: 1d

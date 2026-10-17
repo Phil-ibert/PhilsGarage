@@ -15,6 +15,7 @@ d'origine, sans le reflasher.
 
    ```yaml
    substitutions:
+     lora_aes_key: !secret phils_lora_aes_key   # ou la valeur directement
      philsgarage_refresh: 1d
 
    packages:
@@ -29,9 +30,11 @@ d'origine, sans le reflasher.
 
    Ou copie simplement le fichier [`lora-garage.yaml`](lora-garage.yaml) de ce dépôt,
    qui est un exemple complet.
-2. Ajoute `phils_lora_aes_key` à ton `secrets.yaml` ESPHome (voir
-   [`secrets.example.yaml`](secrets.example.yaml)) : le contenu de `aes_key[32]` de
-   `PhilsCryptoLoRa.h` (le format `0x.., 0x.., ...` du tableau C est accepté tel quel).
+2. `lora_aes_key` = la clé AES-256 de l'émetteur, le contenu de `aes_key[32]` de
+   `PhilsCryptoLoRa.h` (64 caractères hexa, ou le tableau C `0x.., 0x.., ...` tel quel).
+   Tu peux l'écrire directement dans le YAML du module ou, comme ci-dessus, la mettre
+   dans ton `secrets.yaml` sous `phils_lora_aes_key` (voir
+   [`secrets.example.yaml`](secrets.example.yaml)).
 3. Premier flash en USB, ensuite en OTA.
 4. Supprime l'ancien appareil MQTT « Garage LoRa » (Paramètres > Appareils) : ça efface
    aussi ses messages de découverte retenus sur le broker.

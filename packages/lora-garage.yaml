@@ -8,7 +8,8 @@
 #  Package de base, sans la radio : à combiner avec packages/radio/<puce>.yaml.
 #  Ne contient rien de propre à l'appareil (Wi-Fi, API, OTA) : à ajouter au YAML
 #  de ton module ESPHome, voir lora-garage.yaml à la racine du dépôt.
-#  Le seul !secret (phils_lora_aes_key) est lu dans ton secrets.yaml ESPHome.
+#  Aucun !secret ici : la clé AES vient de la substitution `lora_aes_key`,
+#  à définir dans le YAML de ton module (valeur directe ou !secret).
 # ===========================================================================
 
 substitutions:
@@ -59,7 +60,7 @@ web_server:
 # ---------------------------------------------------------------------------
 phils_lora:
   id: lora_link
-  key: !secret phils_lora_aes_key
+  key: ${lora_aes_key}   # défini dans `substitutions:` du YAML de ton module
 
 debug:
   update_interval: 60s

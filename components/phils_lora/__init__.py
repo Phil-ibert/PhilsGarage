@@ -32,6 +32,11 @@ def validate_aes256_key(value):
         data = [cv.hex_uint8_t(v) for v in value]
     else:
         text = cv.string_strict(value)
+        if "${" in text:
+            raise cv.Invalid(
+                f"{text} n'est pas défini : ajoute `lora_aes_key:` (valeur de la clé ou "
+                "!secret phils_lora_aes_key) dans le bloc `substitutions:` du YAML du module"
+            )
         for sep in (":", " ", "-", ",", "0x"):
             text = text.replace(sep, "")
         if len(text) != 64:
