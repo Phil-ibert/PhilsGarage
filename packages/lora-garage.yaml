@@ -6,8 +6,9 @@
 #  même format "#T:..;H:..;L:..;E:..;P:..$~crc32".
 #
 #  Package de base, sans la radio : à combiner avec packages/radio/<puce>.yaml.
-#  Voir lora-garage.yaml à la racine du dépôt (fichier à placer dans Home Assistant).
-#  Les !secret sont lus dans le secrets.yaml de ton dossier ESPHome.
+#  Ne contient rien de propre à l'appareil (Wi-Fi, API, OTA) : à ajouter au YAML
+#  de ton module ESPHome, voir lora-garage.yaml à la racine du dépôt.
+#  Le seul !secret (phils_lora_aes_key) est lu dans ton secrets.yaml ESPHome.
 # ===========================================================================
 
 substitutions:
@@ -42,29 +43,15 @@ logger:
   logs:
     sx127x: INFO
 
-api:
-  encryption:
-    key: !secret lora_garage_api_key
-
-ota:
-  - platform: esphome
-    # Chiffré avec la clé de l'API (pas besoin de mot de passe séparé)
-    encryption:
-
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  ap:
-    ssid: "${name} fallback"
-    password: !secret lora_garage_ap_password
-
-captive_portal:
+# api:, ota:, wifi: et captive_portal: sont volontairement absents : ils sont
+# propres à chaque appareil et restent dans TON fichier (celui créé par
+# l'assistant ESPHome), qui reste maître de ces blocs.
 
 # Page d'état locale (remplace le WebServer de Receiver.ino) : http://lora-garage.local
 web_server:
   port: 80
   version: 3
-  ota: false   # les mises à jour passent par l'OTA chiffrée ci-dessus
+  ota: false   # les mises à jour passent par l'OTA de ton fichier
 
 # ---------------------------------------------------------------------------
 # Protocole : la clé AES-256 doit être celle de PhilsCryptoLoRa.h (aes_key[32]).

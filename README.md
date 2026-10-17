@@ -9,23 +9,45 @@ d'origine, sans le reflasher.
 
 ## Utilisation depuis Home Assistant
 
-1. Dans l'add-on ESPHome, crée `lora-garage.yaml` avec le contenu du fichier
-   [`lora-garage.yaml`](lora-garage.yaml) de ce dépôt. C'est le seul fichier à copier :
-   la configuration et le composant `phils_lora` sont téléchargés depuis GitHub.
-2. Ajoute à ton `secrets.yaml` ESPHome les clés de [`secrets.example.yaml`](secrets.example.yaml).
-   `phils_lora_aes_key` = le contenu de `aes_key[32]` de `PhilsCryptoLoRa.h`
-   (le format `0x.., 0x.., ...` du tableau C est accepté tel quel).
+1. Dans l'add-on ESPHome, crée l'appareil avec l'assistant (« + Nouvel appareil »,
+   ESP32). Garde ce qu'il génère (`esphome`, `esp32`, `api`, `ota`, `wifi`,
+   `captive_portal`) et **ajoute** à la fin de son YAML :
+
+   ```yaml
+   substitutions:
+     philsgarage_refresh: 1d
+
+   packages:
+     philsgarage:
+       url: https://github.com/Phil-ibert/PhilsGarage
+       ref: main
+       refresh: ${philsgarage_refresh}
+       files:
+         - packages/lora-garage.yaml
+         - packages/radio/sx127x.yaml
+   ```
+
+   Ou copie simplement le fichier [`lora-garage.yaml`](lora-garage.yaml) de ce dépôt,
+   qui est un exemple complet.
+2. Ajoute `phils_lora_aes_key` à ton `secrets.yaml` ESPHome (voir
+   [`secrets.example.yaml`](secrets.example.yaml)) : le contenu de `aes_key[32]` de
+   `PhilsCryptoLoRa.h` (le format `0x.., 0x.., ...` du tableau C est accepté tel quel).
 3. Premier flash en USB, ensuite en OTA.
 4. Supprime l'ancien appareil MQTT « Garage LoRa » (Paramètres > Appareils) : ça efface
    aussi ses messages de découverte retenus sur le broker.
 
+Ton YAML reste maître : pour un bloc simple (`esphome`, `esp32`, `logger`,
+`web_server`, `substitutions`...), tes valeurs l'emportent sur celles du dépôt ; les
+listes (`sensor:`, `switch:`...) s'ajoutent à celles du dépôt. Le package ne contient
+volontairement ni `api`, ni `ota`, ni `wifi`.
+
 Le dépôt doit être accessible par ESPHome (public, ou URL avec jeton pour un dépôt privé).
 ESPHome relit GitHub au plus une fois par jour : pour prendre en compte un push tout de
-suite, mets `philsgarage_refresh: 0s` dans ton `lora-garage.yaml`, compile, puis remets `1d`.
+suite, mets `philsgarage_refresh: 0s`, compile, puis remets `1d`.
 
 ## Changer de carte / de puce Semtech
 
-Dans ton `lora-garage.yaml` :
+Dans le YAML de ton module :
 
 ```yaml
     files:
@@ -41,8 +63,8 @@ Fréquence, SF, BW, CR, préambule et sync word doivent rester identiques à l'�
 
 | Chemin | Rôle |
 |---|---|
-| `lora-garage.yaml` | fichier à placer dans Home Assistant |
-| `packages/lora-garage.yaml` | configuration de la passerelle (entités, Wi-Fi, API...) |
+| `lora-garage.yaml` | exemple complet de YAML de module pour Home Assistant |
+| `packages/lora-garage.yaml` | configuration de la passerelle (entités, page web, diagnostic) |
 | `packages/radio/*.yaml` | une puce Semtech par fichier, câblage et paramètres radio |
 | `components/phils_lora/` | composant externe : chiffrement, CRC, décodage, commandes |
 | `secrets.example.yaml` | clés à ajouter à ton `secrets.yaml` |

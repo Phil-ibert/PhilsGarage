@@ -1,12 +1,45 @@
 # ===========================================================================
-#  Fichier à copier dans le dossier ESPHome de Home Assistant
-#  (/config/esphome/lora-garage.yaml). Tout le reste est téléchargé depuis
-#  GitHub à la compilation ; les !secret viennent de ton secrets.yaml.
+#  YAML du module dans le tableau de bord ESPHome de Home Assistant.
+#
+#  Le plus simple : crée l'appareil avec l'assistant ESPHome (« + Nouvel
+#  appareil »), garde ce qu'il a généré (esphome, esp32, api, ota, wifi,
+#  captive_portal) et ajoute-lui les blocs `substitutions:` et `packages:`
+#  ci-dessous. Ou copie ce fichier entier à la place.
+#
+#  La passerelle (entités, radio, composant phils_lora) est téléchargée depuis
+#  GitHub ; ton fichier reste maître de tout ce qu'il définit lui-même.
 # ===========================================================================
 
-substitutions:
+esphome:
   name: lora-garage
   friendly_name: Garage LoRa
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret lora_garage_api_key
+
+ota:
+  - platform: esphome
+    encryption:     # chiffrée avec la clé de l'API
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Lora-Garage Fallback Hotspot"
+    password: !secret lora_garage_ap_password
+
+captive_portal:
+
+# --------------------------- Passerelle LoRa -------------------------------
+substitutions:
   # Fréquence à laquelle ESPHome relit le dépôt GitHub ; 0s pour forcer
   # la prise en compte d'un push, puis remets 1d.
   philsgarage_refresh: 1d
